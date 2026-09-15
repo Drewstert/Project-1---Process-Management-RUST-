@@ -1,179 +1,33 @@
-use std::sync::{Arc, Mutex};
-use std::thread;
-use std::time::Duration;
+# Smart Traffic Management System: Code Breakdown
 
-// A shared resource for the unsynchronized demonstration.
-// In safe Rust, concurrent access to a mutable static variable is forbidden.
-// We must use 'unsafe' to force the data race.
-static mut UNSYNC_COUNTER: i32 = 0;
+## How the Code Works
 
-fn main() {
-    println!("==================================================");
-    println!("1. THREAD CREATION DEMONSTRATION");
-    println!("==================================================\n");
-    demo_thread_creation();
+This program is a command-line application split into four distinct demonstrations of multi-threading:
 
-    println!("\n==================================================");
-    println!("2. UNSYNCHRONIZED VS SYNCHRONIZED DEMONSTRATION");
-    println!("==================================================\n");
-    demo_sync_vs_unsync();
+* **Part 1 (Coordination):** Uses `Arc` (Atomic Reference Counted) and a `Mutex` to safely share a central `IntersectionState` among five threads. Four "sensor" threads write data to the state, and one "controller" thread reads it to make a traffic light decision.
+* **Part 2A (Unsynchronized):** Simulates a race condition. Five threads try to increment a shared counter 100,000 times each. It intentionally separates the *load*, *add*, and *store* steps to create a logical flaw.
+* **Part 2B (Synchronized):** Fixes the race condition by wrapping the counter in a `Mutex`, forcing threads to take turns modifying the value. 
+* **Part 3 (Scheduling):** Drops down to system-level `libc` calls to pin threads to a single CPU core and alter their "nice" values (OS scheduling priorities), demonstrating how the Linux kernel distributes CPU time.
 
-    println!("\n==================================================");
-    println!("3. THREAD PRIORITY & SCHEDULING INVESTIGATION");
-    println!("==================================================\n");
-    demo_priority_investigation();
-}
+## Why the Team Chose This Approach
 
-/// ---------------------------------------------------------
-/// PART 1: Thread Creation
-/// ---------------------------------------------------------
-fn demo_thread_creation() {
-    let mut handles = vec![];
+* **`Arc<Mutex<T>>` Pattern:** In Rust, data can only have one owner by default. `Arc` is used to give multiple threads shared ownership of the data, while `Mutex` provides "interior mutability"—allowing threads to safely mutate the data one at a time.
+* **`Barrier` Synchronization:** The team used `Barrier::wait()` in the counting and scheduling demos to ensure all threads pause and then start their intensive work at the exact same millisecond. This forces maximum contention and makes race conditions or CPU competition obvious.
 
-    // Thread 1: Math Operations
-    handles.push(thread::spawn(|| {
-        println!("[Thread 1 - Math] Started.");
-        let result = 100 * 42;
-        thread::sleep(Duration::from_millis(50));
-        println!("[Thread 1 - Math] Work complete: 100 * 42 = {}", result);
-        println!("[Thread 1 - Math] Finished.");
-    }));
+## What Could Go Wrong Without Synchronization
 
-    // Thread 2: String Manipulation
-    handles.push(thread::spawn(|| {
-        println!("[Thread 2 - String] Started.");
-        let reversed: String = "Concurrency".chars().rev().collect();
-        thread::sleep(Duration::from_millis(70));
-        println!("[Thread 2 - String] Work complete: Reversed string is '{}'", reversed);
-        println!("[Thread 2 - String] Finished.");
-    }));
+Without proper synchronization, the program suffers from **lost updates** (data races). 
 
-    // Thread 3: Simulated IO
-    handles.push(thread::spawn(|| {
-        println!("[Thread 3 - IO Sim] Started.");
-        thread::sleep(Duration::from_millis(150)); // Simulating a slower disk read
-        println!("[Thread 3 - IO Sim] Work complete: Read 1024 bytes from virtual disk.");
-        println!("[Thread 3 - IO Sim] Finished.");
-    }));
+In Part 2A, the code reads a value (e.g., 5), yields to another thread which also reads 5, and then both threads write `6` back to memory. Even though two vehicles passed, the counter only went up by one. In a real traffic system, this would lead to drastically undercounting vehicles and making incorrect signal decisions.
 
-    // Thread 4: Data Processing
-    handles.push(thread::spawn(|| {
-        println!("[Thread 4 - Array] Started.");
-        let mut numbers = [5, 2, 9, 1, 3];
-        numbers.sort();
-        thread::sleep(Duration::from_millis(60));
-        println!("[Thread 4 - Array] Work complete: Sorted array {:?}", numbers);
-        println!("[Thread 4 - Array] Finished.");
-    }));
+## What the Output Shows
 
-    // Thread 5: Background Timer
-    handles.push(thread::spawn(|| {
-        println!("[Thread 5 - Timer] Started.");
-        for i in 1..=3 {
-            thread::sleep(Duration::from_millis(40));
-            println!("[Thread 5 - Timer] Tick {}...", i);
-        }
-        println!("[Thread 5 - Timer] Finished.");
-    }));
+* **State Dumps:** Part 1 prints a log of each sensor waking up, recording its data, and the final decision the controller makes based on that aggregated data.
+* **Lost Vehicles:** Part 2A outputs an expected count of 500,000, but the actual count is much lower, explicitly printing the number of "lost vehicle detections."
+* **Priority Impact:** Part 3 outputs the number of loop iterations each thread managed to complete in 3 seconds. It shows that threads with a lower `nice` value (higher priority) are granted more CPU time by Linux and therefore complete vastly more calculations than threads with higher `nice` values.
 
-    // Wait for all threads to finish
-    for handle in handles {
-        handle.join().unwrap();
-    }
-}
+## Limitations of the Chosen Approach
 
-/// ---------------------------------------------------------
-/// PART 2: Unsynchronized vs Synchronized
-/// ---------------------------------------------------------
-fn demo_sync_vs_unsync() {
-    let num_threads = 10;
-    let increments_per_thread = 100_000;
-
-    println!("--- Running UNSYNCHRONIZED phase ---");
-    let mut unsync_handles = vec![];
-    
-    for _ in 0..num_threads {
-        unsync_handles.push(thread::spawn(move || {
-            for _ in 0..increments_per_thread {
-                // We use unsafe to intentionally bypass Rust's borrow checker 
-                // and create a classic data race.
-                unsafe {
-                    let temp = UNSYNC_COUNTER;
-                    // A tiny artificial delay to widen the race condition window
-                    // (Omitted here to let standard CPU interleaving do the work)
-                    UNSYNC_COUNTER = temp + 1;
-                }
-            }
-        }));
-    }
-
-    for h in unsync_handles {
-        h.join().unwrap();
-    }
-
-    unsafe {
-        let expected = num_threads * increments_per_thread;
-        println!("Expected counter value: {}", expected);
-        println!("Actual counter value:   {}", UNSYNC_COUNTER);
-        println!("Lost updates:           {}", expected - UNSYNC_COUNTER);
-    }
-
-    println!("\n--- Running SYNCHRONIZED phase ---");
-    // Arc (Atomic Reference Count) allows multiple threads to own the Mutex.
-    // Mutex ensures only one thread can access the data at a time.
-    let sync_counter = Arc::new(Mutex::new(0));
-    let mut sync_handles = vec![];
-
-    for _ in 0..num_threads {
-        let counter_clone = Arc::clone(&sync_counter);
-        sync_handles.push(thread::spawn(move || {
-            for _ in 0..increments_per_thread {
-                // Lock the mutex. This blocks until the lock is acquired.
-                let mut num = counter_clone.lock().unwrap();
-                *num += 1;
-                // Mutex is automatically unlocked when `num` goes out of scope here.
-            }
-        }));
-    }
-
-    for h in sync_handles {
-        h.join().unwrap();
-    }
-
-    let final_val = *sync_counter.lock().unwrap();
-    println!("Expected counter value: {}", num_threads * increments_per_thread);
-    println!("Actual counter value:   {}", final_val);
-    if final_val == (num_threads * increments_per_thread) {
-        println!("Success! No updates were lost.");
-    }
-}
-
-/// ---------------------------------------------------------
-/// PART 3: Thread Priority and Scheduling Behavior
-/// ---------------------------------------------------------
-fn demo_priority_investigation() {
-    println!("Spawning 3 intensive computational threads simultaneously...");
-    
-    // In standard Rust, there is NO native API to set thread priorities.
-    // We will launch three identical CPU-bound threads and observe the OS scheduling.
-    
-    let mut handles = vec![];
-    
-    for id in 1..=3 {
-        handles.push(thread::spawn(move || {
-            println!("[Priority-Test Thread {}] Started computing.", id);
-            let mut _dummy_sum: u64 = 0;
-            // A long, meaningless loop to consume CPU time
-            for i in 0..50_000_000 {
-                _dummy_sum = _dummy_sum.wrapping_add(i);
-            }
-            println!("[Priority-Test Thread {}] Finished computing.", id);
-        }));
-    }
-
-    for h in handles {
-        h.join().unwrap();
-    }
-    
-    println!("\nPriority Investigation Complete.");
-}
+* **Mutex Bottlenecks:** A `Mutex` forces threads to operate sequentially when accessing shared data. If the signal controller holds the lock for too long while calculating, all traffic sensors are blocked from recording new data, destroying the performance benefits of multi-threading.
+* **Platform Dependency:** Part 3 relies heavily on `libc` and Linux-specific OS APIs (`sched_setaffinity`, `setpriority`). This code will fail to compile or crash on Windows or macOS.
+* **Privilege Requirements:** Lowering a "nice" value to increase a thread's priority usually requires root (`sudo`) privileges in Linux. Running this as a normal user means the OS might reject the priority changes.
