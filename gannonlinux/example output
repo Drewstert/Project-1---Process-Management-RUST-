@@ -1,0 +1,203 @@
+==================================================
+SMART TRAFFIC MANAGEMENT SYSTEM
+PART 1: COORDINATED THREAD CREATION
+==================================================
+[North/South Sensor] STARTED
+[East/West Sensor] STARTED
+[Emergency Detector] STARTED
+[Pedestrian Monitor] STARTED
+[Pedestrian Monitor] Work: 6 pedestrians waiting
+[Pedestrian Monitor] FINISHED
+[North/South Sensor] Work: detected 42 vehicles
+[North/South Sensor] FINISHED
+[East/West Sensor] Work: detected 27 vehicles
+[East/West Sensor] FINISHED
+[Emergency Detector] Work: emergency vehicle detected
+[Emergency Detector] FINISHED
+[Signal Controller] STARTED
+[Signal Controller] Reading shared intersection state...
+[Signal Controller] North/South vehicles: 42
+[Signal Controller] East/West vehicles: 27
+[Signal Controller] Pedestrians waiting: 6
+[Signal Controller] Emergency detected: true
+[Signal Controller] Work: decision = Give priority to emergency vehicle
+[Signal Controller] FINISHED
+
+Final shared intersection state:
+IntersectionState {
+    north_south_vehicles: 42,
+    east_west_vehicles: 27,
+    pedestrians_waiting: 6,
+    emergency_vehicle_detected: true,
+    signal_decision: "Give priority to emergency vehicle",
+}
+
+All five coordinated threads finished.
+    Finished `release` profile [optimized] target(s) in 0.02s
+     Running `target/release/os_threading_project unsync`
+
+==================================================
+PART 2A: UNSYNCHRONIZED TRAFFIC COUNTER
+==================================================
+Five road sensors are updating the same total vehicle counter.
+Each sensor reports 100000 vehicle detections.
+[road-sensor-1] STARTED
+[road-sensor-2] STARTED
+[road-sensor-3] STARTED
+[road-sensor-5] STARTED
+[road-sensor-4] STARTED
+[road-sensor-4] Work: reported 100000 vehicles
+[road-sensor-4] FINISHED
+[road-sensor-1] Work: reported 100000 vehicles
+[road-sensor-3] Work: reported 100000 vehicles
+[road-sensor-3] FINISHED
+[road-sensor-1] FINISHED
+[road-sensor-5] Work: reported 100000 vehicles
+[road-sensor-2] Work: reported 100000 vehicles
+[road-sensor-2] FINISHED
+[road-sensor-5] FINISHED
+
+Expected total vehicles : 500000
+Recorded total vehicles : 133028
+Lost vehicle detections : 366972
+
+RESULT: The traffic count is incorrect because updates were lost.
+This demonstrates an unsynchronized logical race.
+    Finished `release` profile [optimized] target(s) in 0.01s
+     Running `target/release/os_threading_project sync`
+
+==================================================
+PART 2B: SYNCHRONIZED TRAFFIC COUNTER
+==================================================
+The same five sensors now update a Mutex-protected counter.
+[protected-road-sensor-2] STARTED
+[protected-road-sensor-5] STARTED
+[protected-road-sensor-3] STARTED
+[protected-road-sensor-1] STARTED
+[protected-road-sensor-4] STARTED
+[protected-road-sensor-5] Work: safely recorded 100000 vehicles
+[protected-road-sensor-5] FINISHED
+[protected-road-sensor-4] Work: safely recorded 100000 vehicles
+[protected-road-sensor-4] FINISHED
+[protected-road-sensor-3] Work: safely recorded 100000 vehicles
+[protected-road-sensor-3] FINISHED
+[protected-road-sensor-2] Work: safely recorded 100000 vehicles
+[protected-road-sensor-2] FINISHED
+[protected-road-sensor-1] Work: safely recorded 100000 vehicles
+[protected-road-sensor-1] FINISHED
+
+Expected total vehicles : 500000
+Recorded total vehicles : 500000
+
+RESULT: Correct count. The Mutex prevented lost updates.
+
+The Mutex provides MUTUAL EXCLUSION.
+It does NOT guarantee which sensor thread runs first.
+    Finished `release` profile [optimized] target(s) in 0.02s
+     Running `target/release/os_threading_project schedule`
+
+==================================================
+PART 3: TRAFFIC ANALYSIS SCHEDULING
+==================================================
+Three traffic-analysis threads will compete for CPU time.
+Default main-thread nice value: 0
+All analysis threads will compete on CPU 0.
+
+==================================================
+ROUND 1: DEFAULT SCHEDULING
+==================================================
+All three threads use the same default nice value.
+
+[Emergency Traffic Analysis] STARTED
+[Emergency Traffic Analysis] Requested nice value: 0
+[Emergency Traffic Analysis] Linux policy = SCHED_OTHER
+[Emergency Traffic Analysis] Static priority = 0
+[Emergency Traffic Analysis] Actual nice value = 0
+
+[Congestion Analysis] STARTED
+[Congestion Analysis] Requested nice value: 0
+[Congestion Analysis] Linux policy = SCHED_OTHER
+[Congestion Analysis] Static priority = 0
+[Congestion Analysis] Actual nice value = 0
+
+[Historical Statistics] STARTED
+[Historical Statistics] Requested nice value: 0
+[Historical Statistics] Linux policy = SCHED_OTHER
+[Historical Statistics] Static priority = 0
+[Historical Statistics] Actual nice value = 0
+[Historical Statistics] FINISHED with 27250166 calculations
+[Congestion Analysis] FINISHED with 25950159 calculations
+[Emergency Traffic Analysis] FINISHED with 25964726 calculations
+
+================ SCHEDULING RESULTS ================
+
+Task: Emergency Traffic Analysis
+Requested nice: 0
+Actual nice: 0
+Scheduling policy: SCHED_OTHER
+Static priority: 0
+Calculations completed: 25964726
+
+Task: Congestion Analysis
+Requested nice: 0
+Actual nice: 0
+Scheduling policy: SCHED_OTHER
+Static priority: 0
+Calculations completed: 25950159
+
+Task: Historical Statistics
+Requested nice: 0
+Actual nice: 0
+Scheduling policy: SCHED_OTHER
+Static priority: 0
+Calculations completed: 27250166
+
+==================================================
+ROUND 2: MODIFIED NICE VALUES
+==================================================
+The three threads now use different Linux nice values.
+
+[Emergency Traffic Analysis] STARTED
+[Emergency Traffic Analysis] Requested nice value: 0
+
+[Congestion Analysis] STARTED
+[Congestion Analysis] Requested nice value: 5
+
+[Historical Statistics] STARTED
+[Historical Statistics] Requested nice value: 10
+[Emergency Traffic Analysis] Linux policy = SCHED_OTHER
+[Emergency Traffic Analysis] Static priority = 0
+[Emergency Traffic Analysis] Actual nice value = 0
+[Congestion Analysis] Linux policy = SCHED_OTHER
+[Congestion Analysis] Static priority = 0
+[Congestion Analysis] Actual nice value = 5
+[Historical Statistics] Linux policy = SCHED_OTHER
+[Historical Statistics] Static priority = 0
+[Historical Statistics] Actual nice value = 10
+[Emergency Traffic Analysis] FINISHED with 56634501 calculations
+[Historical Statistics] FINISHED with 6206191 calculations
+[Congestion Analysis] FINISHED with 23028425 calculations
+
+================ SCHEDULING RESULTS ================
+
+Task: Emergency Traffic Analysis
+Requested nice: 0
+Actual nice: 0
+Scheduling policy: SCHED_OTHER
+Static priority: 0
+Calculations completed: 56634501
+
+Task: Congestion Analysis
+Requested nice: 5
+Actual nice: 5
+Scheduling policy: SCHED_OTHER
+Static priority: 0
+Calculations completed: 23028425
+
+Task: Historical Statistics
+Requested nice: 10
+Actual nice: 10
+Scheduling policy: SCHED_OTHER
+Static priority: 0
+Calculations completed: 6206191
+vboxuser@linuxrustrunner:~/os_th

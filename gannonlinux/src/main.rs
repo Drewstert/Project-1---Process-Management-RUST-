@@ -7,152 +7,268 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 // ============================================================
-// SMART TRAFFIC MANAGEMENT SYSTEM
+// SHARED INTERSECTION STATE
 // ============================================================
 
+#[derive(Debug)]
+struct IntersectionState {
+    north_south_vehicles: u32,
+    east_west_vehicles: u32,
+    pedestrians_waiting: u32,
+    emergency_vehicle_detected: bool,
+    signal_decision: String,
+}
+
 // ============================================================
-// PART 1: FIVE DISTINCT THREADS
+// PART 1: FIVE COORDINATED THREADS
 // ============================================================
 
 fn demo_thread_creation() {
     println!("\n==================================================");
     println!("SMART TRAFFIC MANAGEMENT SYSTEM");
-    println!("PART 1: THREAD CREATION");
+    println!("PART 1: COORDINATED THREAD CREATION");
     println!("==================================================");
+
+    let state = Arc::new(Mutex::new(IntersectionState {
+        north_south_vehicles: 0,
+        east_west_vehicles: 0,
+        pedestrians_waiting: 0,
+        emergency_vehicle_detected: false,
+        signal_decision: "No decision yet".to_string(),
+    }));
 
     let mut handles = Vec::new();
 
-    // --------------------------------------------------------
-    // Thread 1: North/South traffic sensor
-    // --------------------------------------------------------
-    handles.push(
-        thread::Builder::new()
-            .name("north-south-sensor".to_string())
-            .spawn(|| {
-                println!("[North/South Sensor] STARTED");
+    // ========================================================
+    // THREAD 1: NORTH/SOUTH TRAFFIC SENSOR
+    // ========================================================
 
-                let vehicles_detected = 42;
+    {
+        let shared_state = Arc::clone(&state);
 
-                thread::sleep(Duration::from_millis(150));
+        handles.push(
+            thread::Builder::new()
+                .name("north-south-sensor".to_string())
+                .spawn(move || {
+                    println!("[North/South Sensor] STARTED");
 
-                println!(
-                    "[North/South Sensor] Work: detected {} vehicles",
-                    vehicles_detected
-                );
+                    thread::sleep(Duration::from_millis(100));
 
-                println!("[North/South Sensor] FINISHED");
-            })
-            .expect("Failed to create North/South sensor"),
-    );
+                    let detected = 42;
 
-    // --------------------------------------------------------
-    // Thread 2: East/West traffic sensor
-    // --------------------------------------------------------
-    handles.push(
-        thread::Builder::new()
-            .name("east-west-sensor".to_string())
-            .spawn(|| {
-                println!("[East/West Sensor] STARTED");
+                    {
+                        let mut state = shared_state.lock().unwrap();
 
-                let vehicles_detected = 35;
+                        state.north_south_vehicles = detected;
+                    }
 
-                thread::sleep(Duration::from_millis(100));
-
-                println!(
-                    "[East/West Sensor] Work: detected {} vehicles",
-                    vehicles_detected
-                );
-
-                println!("[East/West Sensor] FINISHED");
-            })
-            .expect("Failed to create East/West sensor"),
-    );
-
-    // --------------------------------------------------------
-    // Thread 3: Pedestrian monitor
-    // --------------------------------------------------------
-    handles.push(
-        thread::Builder::new()
-            .name("pedestrian-monitor".to_string())
-            .spawn(|| {
-                println!("[Pedestrian Monitor] STARTED");
-
-                let pedestrians_waiting = 8;
-
-                thread::sleep(Duration::from_millis(120));
-
-                println!(
-                    "[Pedestrian Monitor] Work: {} pedestrians waiting to cross",
-                    pedestrians_waiting
-                );
-
-                println!("[Pedestrian Monitor] FINISHED");
-            })
-            .expect("Failed to create pedestrian monitor"),
-    );
-
-    // --------------------------------------------------------
-    // Thread 4: Emergency vehicle detector
-    // --------------------------------------------------------
-    handles.push(
-        thread::Builder::new()
-            .name("emergency-detector".to_string())
-            .spawn(|| {
-                println!("[Emergency Detector] STARTED");
-
-                let emergency_vehicle_detected = true;
-
-                thread::sleep(Duration::from_millis(80));
-
-                if emergency_vehicle_detected {
                     println!(
-                        "[Emergency Detector] Work: emergency vehicle detected"
+                        "[North/South Sensor] Work: detected {detected} vehicles"
                     );
-                } else {
-                    println!(
-                        "[Emergency Detector] Work: no emergency vehicle detected"
-                    );
-                }
 
-                println!("[Emergency Detector] FINISHED");
-            })
-            .expect("Failed to create emergency detector"),
-    );
-
-    // --------------------------------------------------------
-    // Thread 5: Traffic signal controller
-    // --------------------------------------------------------
-    handles.push(
-        thread::Builder::new()
-            .name("signal-controller".to_string())
-            .spawn(|| {
-                println!("[Signal Controller] STARTED");
-
-                let green_light_seconds = 30;
-
-                thread::sleep(Duration::from_millis(180));
-
-                println!(
-                    "[Signal Controller] Work: green light timer set to {} seconds",
-                    green_light_seconds
-                );
-
-                println!("[Signal Controller] FINISHED");
-            })
-            .expect("Failed to create signal controller"),
-    );
-
-    // Wait until all five threads finish.
-    for handle in handles {
-        handle.join().expect("A traffic-system thread panicked");
+                    println!("[North/South Sensor] FINISHED");
+                })
+                .expect("Failed to create North/South sensor"),
+        );
     }
 
+    // ========================================================
+    // THREAD 2: EAST/WEST TRAFFIC SENSOR
+    // ========================================================
+
+    {
+        let shared_state = Arc::clone(&state);
+
+        handles.push(
+            thread::Builder::new()
+                .name("east-west-sensor".to_string())
+                .spawn(move || {
+                    println!("[East/West Sensor] STARTED");
+
+                    thread::sleep(Duration::from_millis(120));
+
+                    let detected = 27;
+
+                    {
+                        let mut state = shared_state.lock().unwrap();
+
+                        state.east_west_vehicles = detected;
+                    }
+
+                    println!(
+                        "[East/West Sensor] Work: detected {detected} vehicles"
+                    );
+
+                    println!("[East/West Sensor] FINISHED");
+                })
+                .expect("Failed to create East/West sensor"),
+        );
+    }
+
+    // ========================================================
+    // THREAD 3: PEDESTRIAN MONITOR
+    // ========================================================
+
+    {
+        let shared_state = Arc::clone(&state);
+
+        handles.push(
+            thread::Builder::new()
+                .name("pedestrian-monitor".to_string())
+                .spawn(move || {
+                    println!("[Pedestrian Monitor] STARTED");
+
+                    thread::sleep(Duration::from_millis(80));
+
+                    let pedestrians = 6;
+
+                    {
+                        let mut state = shared_state.lock().unwrap();
+
+                        state.pedestrians_waiting = pedestrians;
+                    }
+
+                    println!(
+                        "[Pedestrian Monitor] Work: {pedestrians} pedestrians waiting"
+                    );
+
+                    println!("[Pedestrian Monitor] FINISHED");
+                })
+                .expect("Failed to create pedestrian monitor"),
+        );
+    }
+
+    // ========================================================
+    // THREAD 4: EMERGENCY VEHICLE DETECTOR
+    // ========================================================
+
+    {
+        let shared_state = Arc::clone(&state);
+
+        handles.push(
+            thread::Builder::new()
+                .name("emergency-detector".to_string())
+                .spawn(move || {
+                    println!("[Emergency Detector] STARTED");
+
+                    thread::sleep(Duration::from_millis(150));
+
+                    let emergency_detected = true;
+
+                    {
+                        let mut state = shared_state.lock().unwrap();
+
+                        state.emergency_vehicle_detected =
+                            emergency_detected;
+                    }
+
+                    if emergency_detected {
+                        println!(
+                            "[Emergency Detector] Work: emergency vehicle detected"
+                        );
+                    } else {
+                        println!(
+                            "[Emergency Detector] Work: no emergency vehicle detected"
+                        );
+                    }
+
+                    println!("[Emergency Detector] FINISHED");
+                })
+                .expect("Failed to create emergency detector"),
+        );
+    }
+
+    // Wait for the four data-producing threads.
+    for handle in handles {
+        handle.join().unwrap();
+    }
+
+    // ========================================================
+    // THREAD 5: SIGNAL CONTROLLER
+    // ========================================================
+
+    let controller_state = Arc::clone(&state);
+
+    let controller = thread::Builder::new()
+        .name("signal-controller".to_string())
+        .spawn(move || {
+            println!("[Signal Controller] STARTED");
+
+            let mut state =
+                controller_state.lock().unwrap();
+
+            println!(
+                "[Signal Controller] Reading shared intersection state..."
+            );
+
+            println!(
+                "[Signal Controller] North/South vehicles: {}",
+                state.north_south_vehicles
+            );
+
+            println!(
+                "[Signal Controller] East/West vehicles: {}",
+                state.east_west_vehicles
+            );
+
+            println!(
+                "[Signal Controller] Pedestrians waiting: {}",
+                state.pedestrians_waiting
+            );
+
+            println!(
+                "[Signal Controller] Emergency detected: {}",
+                state.emergency_vehicle_detected
+            );
+
+            if state.emergency_vehicle_detected {
+                state.signal_decision =
+                    "Give priority to emergency vehicle".to_string();
+            } else if state.north_south_vehicles
+                > state.east_west_vehicles
+            {
+                state.signal_decision =
+                    "Give North/South traffic longer green time"
+                        .to_string();
+            } else if state.east_west_vehicles
+                > state.north_south_vehicles
+            {
+                state.signal_decision =
+                    "Give East/West traffic longer green time"
+                        .to_string();
+            } else if state.pedestrians_waiting > 0 {
+                state.signal_decision =
+                    "Activate pedestrian crossing phase".to_string();
+            } else {
+                state.signal_decision =
+                    "Use normal signal timing".to_string();
+            }
+
+            println!(
+                "[Signal Controller] Work: decision = {}",
+                state.signal_decision
+            );
+
+            println!("[Signal Controller] FINISHED");
+        })
+        .expect("Failed to create signal controller");
+
+    controller.join().unwrap();
+
     println!();
-    println!("Main system: all five traffic-control threads finished.");
+    println!("Final shared intersection state:");
+
+    let final_state =
+        state.lock().unwrap();
+
+    println!("{:#?}", *final_state);
+
+    println!();
+    println!("All five coordinated threads finished.");
 }
 
 // ============================================================
-// PART 2A: UNSYNCHRONIZED VEHICLE COUNTER
+// PART 2A: UNSYNCHRONIZED TRAFFIC COUNTER
 // ============================================================
 
 fn demo_unsynchronized() {
@@ -168,23 +284,24 @@ fn demo_unsynchronized() {
     );
 
     println!(
-        "Each sensor reports {} vehicle detections.",
-        VEHICLES_PER_SENSOR
+        "Each sensor reports {VEHICLES_PER_SENSOR} vehicle detections."
     );
 
     /*
-        We use AtomicUsize so individual memory accesses are safe.
+        AtomicUsize makes each individual load and store atomic.
 
-        However, the complete operation:
+        However, the full sequence:
 
-            1. load the current value
-            2. add one
-            3. store the new value
+            load
+            add 1
+            store
 
-        is NOT performed atomically.
+        is NOT one atomic operation.
 
-        Two sensors can read the same old value and both write
-        the same new value. One vehicle detection is then lost.
+        Two threads can load the same old value and then both
+        store the same incremented value.
+
+        That creates a lost-update logical race.
     */
 
     let total_vehicles =
@@ -193,7 +310,8 @@ fn demo_unsynchronized() {
     let starting_barrier =
         Arc::new(Barrier::new(SENSOR_COUNT));
 
-    let mut handles = Vec::new();
+    let mut handles =
+        Vec::new();
 
     for sensor_id in 1..=SENSOR_COUNT {
         let counter =
@@ -205,38 +323,37 @@ fn demo_unsynchronized() {
         let name =
             format!("road-sensor-{sensor_id}");
 
-        let handle = thread::Builder::new()
-            .name(name.clone())
-            .spawn(move || {
-                println!("[{name}] STARTED");
+        let handle =
+            thread::Builder::new()
+                .name(name.clone())
+                .spawn(move || {
+                    println!("[{name}] STARTED");
 
-                // All sensors begin counting at approximately
-                // the same time.
-                barrier.wait();
+                    // All sensor threads begin together.
+                    barrier.wait();
 
-                for detection in 0..VEHICLES_PER_SENSOR {
-                    let old_value =
-                        counter.load(Ordering::Relaxed);
+                    for detection in 0..VEHICLES_PER_SENSOR {
+                        let old_value =
+                            counter.load(Ordering::Relaxed);
 
-                    // Encourage thread interleaving.
-                    if detection % 50 == 0 {
-                        thread::yield_now();
+                        // Encourage more thread interleaving.
+                        if detection % 50 == 0 {
+                            thread::yield_now();
+                        }
+
+                        counter.store(
+                            old_value + 1,
+                            Ordering::Relaxed,
+                        );
                     }
 
-                    counter.store(
-                        old_value + 1,
-                        Ordering::Relaxed,
+                    println!(
+                        "[{name}] Work: reported {VEHICLES_PER_SENSOR} vehicles"
                     );
-                }
 
-                println!(
-                    "[{name}] Work: reported {} vehicles",
-                    VEHICLES_PER_SENSOR
-                );
-
-                println!("[{name}] FINISHED");
-            })
-            .expect("Failed to create road sensor");
+                    println!("[{name}] FINISHED");
+                })
+                .expect("Failed to create road sensor");
 
         handles.push(handle);
     }
@@ -278,13 +395,13 @@ fn demo_unsynchronized() {
         );
 
         println!(
-            "Run it again because thread scheduling is nondeterministic."
+            "Run the test again because thread scheduling is nondeterministic."
         );
     }
 }
 
 // ============================================================
-// PART 2B: SYNCHRONIZED VEHICLE COUNTER
+// PART 2B: SYNCHRONIZED TRAFFIC COUNTER
 // ============================================================
 
 fn demo_synchronized() {
@@ -300,10 +417,10 @@ fn demo_synchronized() {
     );
 
     /*
-        Arc allows all sensor threads to share ownership.
+        Arc allows all threads to share ownership.
 
-        Mutex allows only one sensor at a time to modify the
-        vehicle count.
+        Mutex ensures that only one thread at a time
+        can modify the shared counter.
     */
 
     let total_vehicles =
@@ -312,7 +429,8 @@ fn demo_synchronized() {
     let starting_barrier =
         Arc::new(Barrier::new(SENSOR_COUNT));
 
-    let mut handles = Vec::new();
+    let mut handles =
+        Vec::new();
 
     for sensor_id in 1..=SENSOR_COUNT {
         let counter =
@@ -324,37 +442,32 @@ fn demo_synchronized() {
         let name =
             format!("protected-road-sensor-{sensor_id}");
 
-        let handle = thread::Builder::new()
-            .name(name.clone())
-            .spawn(move || {
-                println!("[{name}] STARTED");
+        let handle =
+            thread::Builder::new()
+                .name(name.clone())
+                .spawn(move || {
+                    println!("[{name}] STARTED");
 
-                barrier.wait();
+                    barrier.wait();
 
-                for _ in 0..VEHICLES_PER_SENSOR {
-                    /*
-                        Only one thread can hold the MutexGuard
-                        at a time.
-                    */
-                    let mut vehicle_count =
-                        counter.lock().unwrap();
+                    for _ in 0..VEHICLES_PER_SENSOR {
+                        {
+                            let mut vehicle_count =
+                                counter.lock().unwrap();
 
-                    *vehicle_count += 1;
+                            *vehicle_count += 1;
+                        }
+                    }
 
-                    /*
-                        vehicle_count goes out of scope at the end
-                        of each loop iteration, releasing the mutex.
-                    */
-                }
+                    println!(
+                        "[{name}] Work: safely recorded {VEHICLES_PER_SENSOR} vehicles"
+                    );
 
-                println!(
-                    "[{name}] Work: safely recorded {} vehicles",
-                    VEHICLES_PER_SENSOR
+                    println!("[{name}] FINISHED");
+                })
+                .expect(
+                    "Failed to create protected road sensor",
                 );
-
-                println!("[{name}] FINISHED");
-            })
-            .expect("Failed to create protected road sensor");
 
         handles.push(handle);
     }
@@ -378,6 +491,11 @@ fn demo_synchronized() {
         println!(
             "RESULT: Correct count. The Mutex prevented lost updates."
         );
+    } else {
+        println!();
+        println!(
+            "RESULT: Unexpected incorrect count."
+        );
     }
 
     println!();
@@ -391,7 +509,7 @@ fn demo_synchronized() {
 }
 
 // ============================================================
-// PART 3: LINUX SCHEDULING INVESTIGATION
+// PART 3: LINUX THREAD SCHEDULING
 // ============================================================
 
 #[derive(Debug)]
@@ -413,14 +531,9 @@ fn demo_scheduling() {
         "Three traffic-analysis threads will compete for CPU time."
     );
 
-    println!(
-        "Linux nice values will be modified to investigate scheduling."
-    );
-
     let starting_nice =
         current_nice();
 
-    println!();
     println!(
         "Default main-thread nice value: {starting_nice}"
     );
@@ -442,46 +555,68 @@ fn demo_scheduling() {
         }
     }
 
-    /*
-        Three real-world traffic-analysis jobs:
+    // ========================================================
+    // ROUND 1: DEFAULT / NATURAL SCHEDULING
+    // ========================================================
 
-        1. Emergency traffic analysis
-        2. Congestion analysis
-        3. Historical statistics analysis
+    println!();
+    println!("==================================================");
+    println!("ROUND 1: DEFAULT SCHEDULING");
+    println!("==================================================");
 
-        The Linux nice value is changed for each worker.
+    println!(
+        "All three threads use the same default nice value."
+    );
 
-        Lower nice number = more favorable scheduling.
-        Higher nice number = less favorable scheduling.
-
-        This does NOT guarantee execution order.
-    */
-
-    let tasks = [
-        (
-            "Emergency Traffic Analysis",
+    run_scheduling_round(
+        [
             starting_nice,
-        ),
-        (
-            "Congestion Analysis",
+            starting_nice,
+            starting_nice,
+        ],
+        selected_cpu,
+    );
+
+    // ========================================================
+    // ROUND 2: MODIFIED NICE VALUES
+    // ========================================================
+
+    println!();
+    println!("==================================================");
+    println!("ROUND 2: MODIFIED NICE VALUES");
+    println!("==================================================");
+
+    println!(
+        "The three threads now use different Linux nice values."
+    );
+
+    run_scheduling_round(
+        [
+            starting_nice,
             (starting_nice + 5).min(19),
-        ),
-        (
-            "Historical Statistics",
             (starting_nice + 10).min(19),
-        ),
+        ],
+        selected_cpu,
+    );
+}
+
+fn run_scheduling_round(
+    nice_values: [i32; 3],
+    selected_cpu: Option<usize>,
+) {
+    let tasks = [
+        "Emergency Traffic Analysis",
+        "Congestion Analysis",
+        "Historical Statistics",
     ];
 
     let barrier =
         Arc::new(Barrier::new(3));
 
-    let mut handles = Vec::new();
+    let mut handles =
+        Vec::new();
 
-    for (
-        task_name,
-        requested_nice,
-    ) in tasks
-    {
+    for index in 0..3 {
         let barrier =
             Arc::clone(&barrier);
 
@@ -489,102 +624,106 @@ fn demo_scheduling() {
             selected_cpu;
 
         let task_name =
-            task_name.to_string();
+            tasks[index].to_string();
 
-        let handle = thread::Builder::new()
-            .name(task_name.clone())
-            .spawn(move || {
-                println!();
-                println!(
-                    "[{task_name}] STARTED"
-                );
+        let requested_nice =
+            nice_values[index];
 
-                println!(
-                    "[{task_name}] Requested nice value: {requested_nice}"
-                );
+        let handle =
+            thread::Builder::new()
+                .name(task_name.clone())
+                .spawn(move || {
+                    println!();
+                    println!(
+                        "[{task_name}] STARTED"
+                    );
 
-                // Put all three workers on one CPU so they
-                // directly compete for processing time.
-                if let Some(cpu_number) = cpu {
-                    if !pin_current_thread_to_cpu(
-                        cpu_number,
+                    println!(
+                        "[{task_name}] Requested nice value: {requested_nice}"
+                    );
+
+                    // Pin all three workers to one CPU so that
+                    // they compete directly for CPU time.
+                    if let Some(cpu_number) = cpu {
+                        if !pin_current_thread_to_cpu(
+                            cpu_number,
+                        ) {
+                            println!(
+                                "[{task_name}] Warning: CPU affinity failed."
+                            );
+                        }
+                    }
+
+                    // Change this thread's Linux nice value.
+                    if !set_current_thread_nice(
+                        requested_nice,
                     ) {
                         println!(
-                            "[{task_name}] Warning: CPU affinity failed."
+                            "[{task_name}] Warning: could not change nice value: {}",
+                            std::io::Error::last_os_error()
                         );
                     }
-                }
 
-                if !set_current_thread_nice(
-                    requested_nice,
-                ) {
+                    let actual_nice =
+                        current_nice();
+
+                    let (
+                        policy,
+                        static_priority,
+                    ) =
+                        current_scheduling_information();
+
                     println!(
-                        "[{task_name}] Warning: could not change nice value: {}",
-                        std::io::Error::last_os_error()
+                        "[{task_name}] Linux policy = {policy}"
                     );
-                }
 
-                let actual_nice =
-                    current_nice();
-
-                let (
-                    policy,
-                    static_priority,
-                ) =
-                    current_scheduling_information();
-
-                println!(
-                    "[{task_name}] Linux policy = {policy}"
-                );
-
-                println!(
-                    "[{task_name}] Static priority = {static_priority}"
-                );
-
-                println!(
-                    "[{task_name}] Actual nice value = {actual_nice}"
-                );
-
-                // All three begin their CPU-intensive work together.
-                barrier.wait();
-
-                let start =
-                    Instant::now();
-
-                let test_duration =
-                    Duration::from_secs(3);
-
-                let mut calculations: u64 = 0;
-
-                /*
-                    Simulates CPU-intensive traffic-data analysis.
-                */
-                while start.elapsed() < test_duration {
-                    calculations =
-                        calculations.wrapping_add(1);
-
-                    std::hint::black_box(
-                        calculations,
+                    println!(
+                        "[{task_name}] Static priority = {static_priority}"
                     );
-                }
 
-                println!(
-                    "[{task_name}] FINISHED with {calculations} calculations"
+                    println!(
+                        "[{task_name}] Actual nice value = {actual_nice}"
+                    );
+
+                    // Start the CPU-intensive work at
+                    // approximately the same time.
+                    barrier.wait();
+
+                    let start =
+                        Instant::now();
+
+                    let run_time =
+                        Duration::from_secs(3);
+
+                    let mut calculations:
+                        u64 = 0;
+
+                    while start.elapsed() < run_time {
+                        calculations =
+                            calculations.wrapping_add(1);
+
+                        std::hint::black_box(
+                            calculations,
+                        );
+                    }
+
+                    println!(
+                        "[{task_name}] FINISHED with {calculations} calculations"
+                    );
+
+                    SchedulingResult {
+                        task_name,
+                        requested_nice,
+                        actual_nice,
+                        policy,
+                        static_priority,
+                        work_completed:
+                            calculations,
+                    }
+                })
+                .expect(
+                    "Failed to create scheduling thread",
                 );
-
-                SchedulingResult {
-                    task_name,
-                    requested_nice,
-                    actual_nice,
-                    policy,
-                    static_priority,
-                    work_completed:
-                        calculations,
-                }
-            })
-            .expect(
-                "Failed to create scheduling thread",
-            );
 
         handles.push(handle);
     }
@@ -599,7 +738,7 @@ fn demo_scheduling() {
     }
 
     results.sort_by_key(
-        |result| result.actual_nice,
+        |result| result.actual_nice
     );
 
     println!();
@@ -639,34 +778,10 @@ fn demo_scheduling() {
             result.work_completed
         );
     }
-
-   /* println!();
-    println!("INTERPRETATION:");
-
-    println!(
-        "- Linux normally uses SCHED_OTHER for these threads."
-    );
-
-    println!(
-        "- Lower numeric nice values receive more favorable scheduling."
-    );
-
-    println!(
-        "- Higher numeric nice values receive less favorable scheduling."
-    );
-
-    println!(
-        "- Nice values influence scheduling but do NOT guarantee execution order."
-    );
-
-    println!(
-        "- Results can vary between runs because OS scheduling is nondeterministic."
-    );
-    */
 }
 
 // ============================================================
-// LINUX FUNCTIONS USED FOR SCHEDULING DEMONSTRATION
+// LINUX-SPECIFIC SCHEDULING FUNCTIONS
 // ============================================================
 
 fn current_nice() -> i32 {
