@@ -85,3 +85,26 @@ Commands:
   break function_c
   run
   bt
+
+
+
+
+SHOWING GDB COMMAND
+ADD A BREAKPOINT
+break main.rs:86
+Breakpoint 1, main::function_c (parameter_c=12) at main.rs:86
+86	    let local_c = parameter_c + 10;
+
+RUN IT (Run)
+
+
+bt (backtrace) Command
+#0  main::function_c (parameter_c=12) at main.rs:86
+#1  0x0000555555560e27 in main::function_b (parameter_b=6) at main.rs:74
+#2  0x0000555555560c53 in main::function_a (parameter_a=5) at main.rs:55
+#3  0x000055555556149b in main::call_stack_demo () at main.rs:41
+#4  0x00005555555620a0 in main::main () at main.rs:8
+
+
+info args
+parameter_c = 12
