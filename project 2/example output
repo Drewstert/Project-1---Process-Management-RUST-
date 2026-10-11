@@ -1,0 +1,87 @@
+==============================
+PART 1: CALL STACK
+==============================
+Active calls: main -> call_stack_demo
+
+CALL function_a
+Parameter: 5
+Local state: 6
+Active calls: main -> call_stack_demo -> function_a
+
+CALL function_b
+Parameter: 6
+Local state: 12
+Active calls: main -> call_stack_demo -> function_a -> function_b
+
+CALL function_c
+Parameter: 12
+Local state: 22
+Active calls: main -> call_stack_demo -> function_a -> function_b -> function_c
+RETURN function_c -> 22
+
+RETURNED to function_b
+Return value received: 22
+Active calls: main -> call_stack_demo -> function_a -> function_b
+
+RETURNED to function_a
+Return value received: 23
+Active calls: main -> call_stack_demo -> function_a
+Active calls: main -> call_stack_demo
+Final returned value: 24
+
+==============================
+PART 2: HEAP AND LIFETIME
+==============================
+Creating heap allocation
+Allocated data: HeapData { name: "Rust heap example", numbers: [10, 20, 30, 40] }
+Name: Rust heap example
+Numbers: [10, 20, 30, 40]
+Vec length: 4
+Vec capacity: 4
+Data used: total = 100
+Data no longer needed
+Heap allocation dropped
+
+==============================
+PART 3: BUFFERS
+==============================
+
+--- APPROACH 1: WHOLE FILE ---
+Buffer: Vec<u8>
+Capacity: 355
+Valid bytes: 355
+
+--- APPROACH 2: REUSABLE BUFFER ---
+Buffer capacity: 32
+Chunk 1: capacity = 32, valid bytes = 32
+Chunk 2: capacity = 32, valid bytes = 32
+Chunk 3: capacity = 32, valid bytes = 32
+Chunk 4: capacity = 32, valid bytes = 32
+Chunk 5: capacity = 32, valid bytes = 32
+Chunk 6: capacity = 32, valid bytes = 32
+Chunk 7: capacity = 32, valid bytes = 32
+Chunk 8: capacity = 32, valid bytes = 32
+Chunk 9: capacity = 32, valid bytes = 32
+Chunk 10: capacity = 32, valid bytes = 32
+Chunk 11: capacity = 32, valid bytes = 32
+Chunk 12: capacity = 32, valid bytes = 3
+
+--- COMPARISON ---
+Whole-file bytes: 355
+Chunked bytes: 355
+Whole-file checksum: 32017
+Chunked checksum: 32017
+Equivalent results: true
+Whole-file approach: retains the entire input in a Vec.
+Chunked approach: reuses one 32-byte buffer.
+
+==============================
+PART 4: LINUX MEMORY TOOLS
+==============================
+Environment: Native Linux Terminal
+Debugger: GDB
+Commands:
+  gdb ./memory_demo
+  break function_c
+  run
+  bt
