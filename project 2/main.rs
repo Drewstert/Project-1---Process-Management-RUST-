@@ -116,8 +116,10 @@ fn heap_demo() {
         name: String::from("Rust heap example"),
         numbers: vec![10, 20, 30, 40],
     });
-
     println!("Allocated data: {:?}", data);
+
+    inspect_data(&data);
+
     println!("Name: {}", data.name);
     println!("Numbers: {:?}", data.numbers);
     println!("Vec length: {}", data.numbers.len());
@@ -132,6 +134,10 @@ fn heap_demo() {
     println!("Data no longer needed");
     drop(data);
     println!("Heap allocation dropped");
+}
+
+    fn inspect_data(data: &HeapData) {
+    println!("Borrowed name: {}", data.name);
 }
 
 // ============================================================

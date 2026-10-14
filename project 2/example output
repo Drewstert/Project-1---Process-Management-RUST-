@@ -34,6 +34,7 @@ PART 2: HEAP AND LIFETIME
 ==============================
 Creating heap allocation
 Allocated data: HeapData { name: "Rust heap example", numbers: [10, 20, 30, 40] }
+Borrowed name: Rust heap example
 Name: Rust heap example
 Numbers: [10, 20, 30, 40]
 Vec length: 4
