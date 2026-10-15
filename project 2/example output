@@ -109,3 +109,54 @@ bt (backtrace) Command
 
 info args
 parameter_c = 12
+
+
+
+
+PART 4 (CONTINUED): VS CODE DEBUGGER TOOLS
+==============================
+Environment: VS Code 1.141.2 (Windows 11) via Remote-WSL, Ubuntu 26.04
+Debugger: CodeLLDB (bundled LLDB), driving the Call Stack / Variables / Memory Inspector panels
+Target: heap_demo, breakpoint at main.rs:123 (right after Box::new(HeapData {...}))
+
+
+VARIABLES PANEL
+(lldb) frame variable
+(main::HeapData *) data = 0x00005555555b8d90
+
+
+MEMORY INSPECTOR (48 raw bytes at the Box's address)
+(lldb) memory read -c 48 `(void*)&*data`
+0x5555555b8d90: 11 00 00 00 00 00 00 00 50 8d 5b 55 55 55 00 00
+0x5555555b8da0: 11 00 00 00 00 00 00 00 04 00 00 00 00 00 00 00
+0x5555555b8db0: 70 8d 5b 55 55 55 00 00 04 00 00 00 00 00 00 00
+
+
+DECODED BY HAND (little-endian, 8 bytes per field)
++0  11 00 00 00 00 00 00 00  = 17            -> String.len ("Rust heap example")
++8  50 8d 5b 55 55 55 00 00  = 0x...8d50      -> String heap buffer pointer
++16 11 00 00 00 00 00 00 00  = 17            -> String.capacity
++24 04 00 00 00 00 00 00 00  = 4             -> Vec<i32>.len
++32 70 8d 5b 55 55 55 00 00  = 0x...8d70      -> Vec heap buffer pointer
++40 04 00 00 00 00 00 00 00  = 4             -> Vec<i32>.capacity   (matches "Vec capacity: 4" above)
+
+
+FOLLOWING THE POINTERS
+(lldb) memory read -c 17 -f c `*(char**)((char*)&*data + 8)`
+0x5555555b8d50: Rust heap example
+
+(lldb) memory read -s4 -fd `*(int**)((char*)&*data + 32)`
+0x5555555b8d70: 10
+0x5555555b8d74: 20
+0x5555555b8d78: 30
+0x5555555b8d7c: 40
+
+
+WHAT THE TOOL CANNOT ESTABLISH
+warning: This version of LLDB has no plugin for the language "rust".
+Inspection of frame variables will be limited.
+
+(lldb) print data.numbers.as_ptr()
+error: no member named 'as_ptr' in 'alloc::vec::Vec<int, alloc::alloc::Global>'
+note: Expression evaluation in Rust not supported. Falling back to default language.
+Ran expression as 'Objective C++'.
