@@ -1,0 +1,13 @@
+
+[package]
+name = "rust_webcam"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+opencv = { version = "0.101.1", default-features = false, features = [
+    "clang-runtime",
+    "videoio",
+    "highgui",
+    "imgproc"
+] }
